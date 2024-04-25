@@ -14,12 +14,7 @@ def get_config(config_path):
         with open(config_path) as file:
             return json.load(file)
     else:
-        return {
-            'potfile_path': None,
-            'api_key': None,
-            'resubmission_delay': None,
-            'previous_size': None
-        }
+        return {}
 
 
 def update_config(config_data, config_path):
