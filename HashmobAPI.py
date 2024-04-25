@@ -81,7 +81,7 @@ def main():
     algorithm = input("Enter the value for 'algorithm': ")
     while True:
         # Check current size and see if it has changed. If it hasn't wait resubmit delay
-        while not os.path.getsize() > previous_size:
+        while not os.path.getsize(potfile_path) > previous_size:
             time.sleep(resubmission_delay)
 
         previous_size = os.path.getsize()
