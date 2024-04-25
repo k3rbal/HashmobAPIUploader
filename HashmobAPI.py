@@ -56,16 +56,15 @@ def parse_potfile(potfile_path, previous_size):
 
 def main():
     args = setup()
-    config_path = args.config or CONFIG_PATH
-    potfile_path = args.potfile or POTFILE_PATH
     
     # Check for config file or generate defaults
+    config_path = args.config or CONFIG_PATH
     config_data = get_config(config_path)
 
     # Use defined config or ask for defaults on first time
-    potfile_path = config_data.get('potfile_path', input("Enter the path to your hashcat.potfile: "))
-    api_key = config_data.get('api_key', input("Enter your API key: "))
-    resubmission_delay = config_data.get('resubmission_delay', int(input("Enter the delay between resubmissions in seconds: ")))
+    potfile_path = args.potfile or config_data.get('potfile_path') or input("Enter the path to your hashcat.potfile: ")
+    api_key = config_data.get('api_key') or input("Enter your API key: ")
+    resubmission_delay = config_data.get('resubmission_delay') or int(input("Enter the delay between resubmissions in seconds: "))
     previous_size = config_data.get('previous_size', 0)
     
     config_data['potfile_path'] = potfile_path
@@ -79,7 +78,7 @@ def main():
         while not os.path.getsize(potfile_path) > previous_size:
             time.sleep(resubmission_delay)
 
-        previous_size = os.path.getsize()
+        previous_size = os.path.getsize(potfile_path)
         config_data['previous_size'] = previous_size
         update_config(config_data, config_path)
 
