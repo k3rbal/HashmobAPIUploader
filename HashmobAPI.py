@@ -77,14 +77,14 @@ def main():
         # Check current size and see if it has changed. If it hasn't wait resubmit delay
         while not os.path.getsize(potfile_path) > previous_size:
             time.sleep(resubmission_delay)
-
-        previous_size = os.path.getsize(potfile_path)
+            
         config_data['previous_size'] = previous_size
         update_config(config_data, config_path)
 
         # Convert potfile to JSON
         results = parse_potfile(potfile_path, previous_size)
-
+        previous_size = os.path.getsize(potfile_path)
+        
         # Prepare data for API upload
         data = {
             "algorithm": algorithm,
