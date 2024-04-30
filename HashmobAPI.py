@@ -62,7 +62,7 @@ def main():
     except KeyError:
         previous_size = 0
         config.add_section(potfile_path.name)
-        config[potfile_path.name]['full_path'] = str(potfile_path)
+        config[potfile_path.name]['full_path'] = str(potfile_path.resolve())
         config[potfile_path.name]['previous_size'] = str(previous_size)
 
     # Use defined config or ask for defaults on first time
