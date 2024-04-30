@@ -1,25 +1,13 @@
-import json
+from configparser import ConfigParser
+from pathlib import Path
 import requests
 import os
 import argparse
 import time
 
-CONFIG_PATH = 'api_config.json'
+CONFIG_PATH = 'hashmob_config.ini'
 POTFILE_PATH = 'hashcat.potfile'
 API_ENDPOINT = 'https://hashmob.net/api/v2/submit'
-
-
-def get_config(config_path):
-    if os.path.isfile(config_path):
-        with open(config_path) as file:
-            return json.load(file)
-    else:
-        return {}
-
-
-def update_config(config_data, config_path):
-    with open(config_path, 'w') as file:
-        json.dump(config_data, file)
 
 
 def setup():
@@ -28,8 +16,8 @@ def setup():
         description='Repeatedly submits the given potfile after a set delay.'
     )
 
+    parser.add_argument('potfile')
     parser.add_argument('-c', '--config')
-    parser.add_argument('-p', '--potfile')
 
     return parser.parse_args()
 
@@ -57,33 +45,59 @@ def parse_potfile(potfile_path, previous_size):
 def main():
     args = setup()
     
-    # Check for config file or generate defaults
-    config_path = args.config or CONFIG_PATH
-    config_data = get_config(config_path)
+    # Check for config file and create parser
+    config_path = Path(args.config or CONFIG_PATH)
+    config = ConfigParser()
+    config.read(config_path)
+
+    # Validate that the path given exists and is a file
+    potfile_path = Path(args.potfile)
+    if not potfile_path.exists() or not potfile_path.is_file():
+        print('Please provide a valid file for your potfile path!')
+        exit(1)
+
+    # Retrieve the given potfile's size or set to 0
+    try:
+        previous_size = int(config[potfile_path.name]['previous_size'])
+    except KeyError:
+        previous_size = 0
+        config.add_section(potfile_path.name)
+        config[potfile_path.name]['full_path'] = str(potfile_path)
+        config[potfile_path.name]['previous_size'] = str(previous_size)
 
     # Use defined config or ask for defaults on first time
-    potfile_path = args.potfile or config_data.get('potfile_path') or input("Enter the path to your hashcat.potfile: ")
-    api_key = config_data.get('api_key') or input("Enter your API key: ")
-    resubmission_delay = config_data.get('resubmission_delay') or int(input("Enter the delay between resubmissions in seconds: "))
-    previous_size = config_data.get('previous_size', 0)
-    
-    config_data['potfile_path'] = potfile_path
-    config_data['api_key'] = api_key
-    config_data['resubmission_delay'] = resubmission_delay
-    update_config(config_data, config_path)
+    try:
+        api_key = config['API']['api_key']
+        resubmission_delay = int(config['API']['resubmission_delay'])
+    except KeyError:
+        config.add_section('API')
+        
+        api_key = input("Enter your API key: ")
+        config['API']['api_key'] = api_key
 
-    algorithm = input("Enter the value for 'algorithm': ")
+        while not (resubmission_delay := input("Enter the delay between resubmissions in seconds: ")).isdigit():
+            print('Please provide an integer for the delay!')
+            
+        config['API']['resubmission_delay'] = resubmission_delay
+        resubmission_delay = int(resubmission_delay)
+
+    with config_path.open('w') as file:
+        config.write(file)
+
+
+    algorithm = input("Enter the value for algorithm: ")
     while True:
-        # Check current size and see if it has changed. If it hasn't wait resubmit delay
+        # Check current size and see if it has changed. If it hasn't, wait resubmit delay
         while not os.path.getsize(potfile_path) > previous_size:
             time.sleep(resubmission_delay)
             
-        config_data['previous_size'] = previous_size
-        update_config(config_data, config_path)
+        # Update the config with the previous size before parsing
+        config[potfile_path.name]['previous_size'] = str(previous_size)
+        with config_path.open('w') as file:
+            config.write(file)
 
         # Convert potfile to JSON
         results = parse_potfile(potfile_path, previous_size)
-        previous_size = os.path.getsize(potfile_path)
         
         # Prepare data for API upload
         data = {
@@ -94,9 +108,18 @@ def main():
         # Upload data to API
         try:
             response = upload_to_api(data, API_ENDPOINT, api_key)
-            print(f'Status code: {response.status_code}')
+            if response.status_code == 200:
+                print('Successfully sent new finds!')
+                previous_size = os.path.getsize(potfile_path)
+
+                config[potfile_path.name]['previous_size'] = str(previous_size)
+                with config_path.open('w') as file:
+                    config.write(file)
+            else:
+                print(f'Failed to send new finds! We were given a status code of {response.status_code}. '
+                      'Retrying after resubmission delay...')
         except Exception as e:
-            print(f'Error: {e}')
+            print(f'Error encountered when trying to send new finds: {e}')
 
 
 if __name__ == "__main__":
