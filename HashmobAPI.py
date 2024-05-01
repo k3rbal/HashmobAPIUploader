@@ -34,7 +34,7 @@ def upload_to_api(data, api_endpoint, api_key):
 
 def parse_potfile(potfile_path, previous_size):
     results = []
-    with open(potfile_path) as file:
+    with open(potfile_path, encoding='utf8') as file:
         file.seek(previous_size)
         for line in file:
             results.append(line.strip())
